@@ -1,0 +1,50 @@
+import { NextResponse } from 'next/server';
+import connectDB from '@/lib/db';
+import User from '@/models/User';
+import jwt from 'jsonwebtoken';
+
+export async function POST(req: Request) {
+  try {
+    await connectDB();
+    
+    const { email, password, name } = await req.json();
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'User already exists' },
+        { status: 400 }
+      );
+    }
+
+    // Create new user
+    const user = await User.create({
+      email,
+      password,
+      name,
+    });
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    return NextResponse.json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
